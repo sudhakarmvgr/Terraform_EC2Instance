@@ -1,5 +1,69 @@
 <powershell>
-New-Item -Path "c:\" -Name "logfiles" -ItemType "directory"
-Invoke-WebRequest -Uri "http://www.contoso.com" -OutFile "C:\logfiles\"
+New-Item -Path "c:\" -Name "Installable" -ItemType "directory"
+Set-Location -Path "C:\Installable"
+#Install-WindowsFeature -Name Web-Server -IncludeAllSubFeature -ComputerName $env:computername -WhatIf
+# If for whatever reason this doesn't work, check this file:
+Start-Transcript -path "C:\Startup.log" -append
+# Generic functions
+
+
+function S3_Download {
+# Your account access key - must have read access to your S3 Bucket
+$accessKey = "AKIAJK4BYOIGQNW5EGZA"
+# Your account secret access key
+$secretKey = "Z4hdXC4TZEV9RfRjuvYnF8hacgshxvLqvn8Uv/Xl"
+# The region associated with your bucket e.g. eu-west-1, us-east-1 etc. (see http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-regions)
+$region = "ap-southeast-2"
+# The name of your S3 Bucket
+$bucket = "teki123"
+# The folder in your bucket to copy, including trailing slash. Leave blank to copy the entire bucket
+$keyPrefix = "Terraform_PowerShell_Scripts/"
+# The local file path where files should be copied
+$localPath = "C:\Installable\"
+
+$objects = Get-S3Object -BucketName $bucket -KeyPrefix $keyPrefix -AccessKey $accessKey -SecretKey $secretKey -Region $region
+
+foreach($object in $objects) {
+	$localFileName = $object.Key -replace $keyPrefix, ''
+	if ($localFileName -ne '') {
+		$localFilePath = Join-Path $localPath $localFileName
+		Copy-S3Object -BucketName $bucket -Key $object.Key -LocalFile $localFilePath -AccessKey $accessKey -SecretKey $secretKey -Region $region
+	}
+}
+}
+
+# Log a message
+function Log {
+    param (
+        [Parameter(Mandatory=$True)]
+        [string]$msg
+    )
+
+    $time = Get-Date
+    Write-Host $time.ToUniversalTime() "-" $msg
+}
+function Install-IIS {
+	Log "Installing IIS"
+	$iisInstalled = Install-WindowsFeature Web-Server -IncludeManagementTools -IncludeAllSubFeature
+	if ($iisInstalled.Success) {
+	    Log "Success"
+	}
+	else {
+	    Log "IIS Install failed"
+	}
+	return $iisInstalled.Success
+}
+
+function Install-IIS_Elevated {
+PowerShell -NoProfile -ExecutionPolicy Unrestricted -Command "& {Start-Process PowerShell -ArgumentList '-NoProfile -ExecutionPolicy Unrestricted -File ""C:\Installable\IIS Install.ps1""' -Verb RunAs}";
+}
+# Run the script
+#Download S3 Files
+S3_Download
+
+# Install IIS
+#Install-IIS
+
+Install-IIS_Elevated
 
 </powershell>

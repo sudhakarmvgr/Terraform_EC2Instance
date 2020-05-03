@@ -5,3 +5,7 @@ variable "instance1" {
 variable "ami" {
   type = "string"
 }
+
+variable "Dev_PublicKey" {
+  type = "string"
+}
